@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>HG Acil</title>
+<style>
+body{font-family:sans-serif;padding:20px;margin:0;background:#fff;color:#111}
+button.perm{width:100%;padding:18px;font-size:18px;background:#d33;color:#fff;border:none;border-radius:10px;margin-top:12px;font-weight:600;cursor:pointer}
+button.alt{background:#444}
+input{width:100%;padding:14px;font-size:17px;border-radius:10px;border:1px solid #777;margin-top:6px}
+.alert{background:#fffae0;border-left:4px solid #e6a700;padding:12px;border-radius:8px;margin-top:12px;font-size:15px}
+.panel{margin-bottom:16px;padding:16px;background:#f4f4f4;border-radius:12px}
+#panicBtn{background:#d33;font-size:22px;padding:26px;color:#fff;border-radius:12px;border:none;font-weight:600;margin-top:20px;width:100%}
+#confirmBox{display:none;position:fixed;top:30%;left:5%;width:90%;background:#fff;padding:16px;border-radius:12px;box-shadow:0 0 12px rgba(0,0,0,0.3)}
+</style>
+</head>
+<body>
+
+<h2>Hızır Gibi — ACİL Güven</h2>
+<div id="alerts"></div>
+
+<!-- İZİN PANELİ (butonlar aktif, ayrı class) -->
+<div id="permPanel">
+  <h3>Gerekli İzinler</h3>
+  <button class="perm" onclick="requestGPS()">📍 Konum İzni Ver & Devam</button>
+  <button class="perm" onclick="requestMotion()">📱 Hareket Sensörü İzni Ver</button>
+  <button class="perm" onclick="requestNotif()">🔔 Bildirim İzni Ver</button>
+  <button class="perm" onclick="requestBT()">⌚ Bluetooth İzni Ver (Saat için)</button>
+</div>
+
+<!-- PROFİL PANELİ -->
+<div id="profilePanel" class="panel" style="display:none">
+  <h3>Acil Profil</h3>
+  <label>Ad Soyad</label>
+  <input id="ad" placeholder="Ad Soyad"/>
+  <label style="margin-top:12px;display:block">Acil kişi telefonu</label>
+  <input id="tel" placeholder="05xx xxx xx xx"/>
+  <label style="margin-top:12px;display:block">Lisans kodu (trial için boş bırak)</label>
+  <input id="lic" placeholder="HG-2027-01-06-ABCDE"/>
+  <div id="fpBox" style="margin-top:10px;font-size:13px;color:#333"></div>
+  <button class="perm" onclick="saveProfile()">Kaydet & Başla</button>
+</div>
+
+<!-- ANA SİSTEM PANELİ -->
+<div id="mainPanel" class="panel" style="display:none">
+  <h3>Sistem Aktif</h3>
+  <div id="status" class="alert">Veri izleme başlatılmadı…</div>
+  <button id="panicBtn" onclick="panicConfirm()">ACİL</button>
+</div>
+
+<!-- 112 ONAY PANELİ -->
+<div id="confirmBox" class="alert">
+  <div id="confirmText"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+    <button class="perm" onclick="call112()">📞 112'yi Ara</button>
+    <button class="perm alt" onclick="closeConfirm()">İptal</button>
+  </div>
+</div>
+
+<script>
+const LS = localStorage;
+let izinler = JSON.parse(LS.getItem("izinler") || '{"konum":false,"motion":false,"notif":false,"bt":false}');
+LS.setItem("izinler", JSON.stringify(izinler));
+
+// fingerprint üret
+async function fingerprint(){
+  const data = navigator.userAgent + screen.width + screen.height + Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(data));
+  return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+// UI panel geçişi
+function showPanel(id){
+  document.getElementById("permPanel").style.display = "none";
+  document.getElementById("profilePanel").style.display = "none";
+  document.getElementById("mainPanel").style.display = "none";
+  document.getElementById("confirmBox").style.display = "none";
+  document.getElementById(id).style.display = "block";
+}
+
+// uyarı
+function warn(t){
+  document.getElementById("alerts").innerHTML += `<div class="alert">${t}</div>`;
+  console.warn(t);
+}
+
+// konum izni → profil paneline geç
+async function requestGPS(){
+  navigator.geolocation.getCurrentPosition(async ()=>{
+    izinler.konum = true;
+    LS.setItem("trial_start", LS.getItem("trial_start") || Date.now());
+    LS.setItem("license_fp", LS.getItem("license_fp") || await fingerprint());
+    LS.setItem("izinler", JSON.stringify(izinler));
+    document.getElementById("fpBox").innerText = "Cihaz Kimliği: " + await fingerprint();
+    showPanel("profilePanel");
+  }, ()=>{
+    warn("Konum izni verilmedi → Konum bazlı acil analiz kapalı olur.");
+  });
+}
+
+// hareket sensörü
+async function requestMotion(){
+  if(typeof DeviceMotionEvent.requestPermission === "function"){
+    const r = await DeviceMotionEvent.requestPermission();
+    if(r === "granted"){ izinler.motion = true; LS.setItem("izinler", JSON.stringify(izinler)); }
+    else warn("Hareket sensörü izni yok → düşme/çarpma analizi kapalı.");
+  }
+}
+
+// bildirim
+async function requestNotif(){
+  const r = await Notification.requestPermission();
+  if(r === "granted"){ izinler.notif = true; LS.setItem("izinler", JSON.stringify(izinler)); }
+  else warn("Bildirim izni yok → bildirim gönderme kapalı.");
+}
+
+// bluetooth
+async function requestBT(){
+  if(!navigator.bluetooth){ warn("Bluetooth desteklenmiyor."); return; }
+  try{
+    await navigator.bluetooth.requestDevice({acceptAllDevices:true});
+    izinler.bt = true;
+    LS.setItem("izinler", JSON.stringify(izinler));
+  }catch{
+    warn("Bluetooth izni yok → saat verisi kapalı.");
+  }
+}
+
+// profil kaydet ve sisteme geç
+async function saveProfile(){
+  const ad=document.getElementById("ad").value.trim();
+  const tel=document.getElementById("tel").value.trim();
+  const lic=document.getElementByid("lic").value.trim();
+  const fp = await fingerprint();
+
+  if(!ad || !tel) return alert("Ad ve acil kişi telefonu zorunlu!");
+
+  // lisans süresi kontrol (offline)
+  if(lic && !lic.startsWith("HG-")){
+    return izinLost("Lisans formatı hatalı.");
+  }
+  if(lic){
+    const datePart = lic.split("-")[1];
+    const end = new Date(datePart).getTime();
+    if(Date.now() > end) return alert("Lisans süresi dolmuş!");
+    const savedFP = LS.getItem("license_fp");
+    if(savedFP && savedFP !== fp) return alert("Bu lisans bu cihazda çalışamaz!");
+    LS.setItem("license_fp", fp);
+    LS.setItem("license_key", lic);
+  }
+
+  LS.setItem("profile", JSON.stringify({ad,tel}));
+  LS.setItem("acilTel", tel);
+  showPanel("mainPanel");
+  startWatch();
+  startGPSWatch();
+  startBatteryLoop();
+}
+
+// saatten HR dinleme (opsiyonel)
+function startWatch(){
+  if(!izinler.bt) return;
+  navigator.bluetooth.requestDevice({filters:[{services:['heart_rate']}]})
+  .then(d=>d.gatt.connect())
+  .then(s=>s.getPrimaryService('heart_rate'))
+  .then(r=>r.getCharacteristic('heart_rate_measurement'))
+  .then(c=>{
+    setInterval(()=>c.startNotifications().then(()=>setTimeout(()=>c.stopNotifications(),2000)),30000);
+    c.oncharacteristicvaluechanged=e=>{
+      const hr=e.target.value.getUint8(1);
+      LS.setItem("hr", hr);
+      console.log("Kalp Ritmi:", hr);
+    };
+  }).catch(()=> warn("Saat bağlanamadı → HR kapalı."));
+}
+
+// konum izleme döngüsü
+function startGPSWatch(){
+  navigator.geolocation.watchPosition(p=>{
+    const {latitude, longitude} = p.coords;
+    const msg = `📍 Konum: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+    console.log(msg);
+  }, ()=> warn("Konum kesildi!"), {enableHighAccuracy:true});
+}
+
+// pil döngüsü
+function startBatteryLoop(){
+  navigator.getBattery().then(b=>{
+    b.onlevelchange = ()=>{
+      const lvl = Math.round(b.level * 100);
+      console.log("Pil:", lvl);
+      if(lvl <= 5) sendSMS(`Pil %${lvl} kritik!`);
+      if(lvl <= 1) sendSMS("Pil %1 hayati kritik!");
+    }
+  });
+}
+
+// SMS gönder (manuel + pil + sensör)
+function sendSMS(t,tel){ location.href = `sms:${tel}?body=${encodeURIComponent(t)}`; }
+function panicConfirm(){ const p=JSON.parse(LS.getItem("profile")||"{}"); document.getElementById("confirmText").innerText=`112 aranabilir. Devam?`; document.getElementById("confirmBox").style.display="block"; }
+function call112(){ location.href="tel:112"; }
+function closeConfirm(){ document.getElementById("confirmBox").style.display="none"; }
+</script>
+
+</body>
+</html>
