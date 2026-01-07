@@ -13,27 +13,35 @@ button.alt{background:#222}
 .panel{padding:16px;background:#f2f2f2;border-radius:10px;margin-bottom:14px}
 #panicBtn{background:#c00;font-size:22px;padding:26px;border-radius:12px;width:100%;font-weight:700}
 #confirmBox{display:none;position:fixed;top:30%;left:5%;width:90%;background:#fff;padding:16px;border-radius:12px;box-shadow:0 0 16px rgba(0,0,0,0.3)}
-.row{margin-top:10px}
+#settingsPanel{display:none}
+#profilePanel{display:none}
+#permPanel{display:none}
+#mainPanel{display:none}
 </style>
 </head>
 <body>
 
 <h2>Hızır Gibi — Acil Güven</h2>
-<div id="alerts"></div>
+
+<!-- Üst menü sabit -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+  <button class="alt" onclick="openSettings()">⚙ Ayarlar</button>
+  <button class="alt" onclick="showPanel('permPanel')">📌 İzinler</button>
+</div>
 
 <!-- İzin Paneli -->
 <div id="permPanel" class="panel">
   <h3>Gerekli İzinler</h3>
   <button onclick="requestGPS()">📍 Konum izni</button>
+  <button onclick="requestMotion()">📱 İvme sensörü izni</button>
   <button onclick="requestNotif()">🔔 Bildirim izni</button>
-  <button onclick="requestBT()" class="alt">⌚ Bluetooth (opsiyonel)</button>
-  <button onclick="checkSensors()" class="alt">📱 İvme sensörü kontrol</button>
-  <div id="sensorResult" class="row"></div>
+  <button onclick="requestBT()" class="alt">⌚ Bluetooth izni</button>
+  <div id="permResult" class="row"></div>
   <button onclick="permissionsDone()" class="alt">İzinler tamamlandı</button>
 </div>
 
 <!-- Profil Paneli -->
-<div id="profilePanel" class="panel" style="display:none">
+<div id="profilePanel" class="panel">
   <h3>Acil Profil</h3>
   <div id="deviceBox" style="font-size:13px;color:#333;margin-bottom:8px"></div>
 
@@ -64,9 +72,12 @@ button.alt{background:#222}
 </div>
 
 <!-- Ana Sistem Paneli -->
-<div id="mainPanel" class="panel" style="display:none">
-  <h3>Sistem Aktif</h3>
-  <div id="status" class="alert">📡 İzleme başlıyor…</div>
+<div id="mainPanel" class="panel">
+  <h3>Sistem Durumu</h3>
+  <div id="statusBox" class="alert">📡 Sistem başlatılmadı…</div>
+
+  <button onclick="callEmergency(1)" id="acil1btn" style="display:none"></button>
+  <button onclick="callEmergency(2)" id="acil2btn" style="display:none"></button>
   <button id="panicBtn" onclick="panicConfirm()">ACİL</button>
 </div>
 
@@ -74,14 +85,14 @@ button.alt{background:#222}
 <div id="confirmBox">
   <div id="confirmText"></div>
   <button onclick="call112()" class="row">📞 112’yi Ara</button>
-  <button onclick="callEmergency(1)" id="acil1btn" class="row"></button>
-  <button onclick="callEmergency(2)" id="acil2btn" class="row"></button>
+  <button onclick="callEmergency(1)" id="confirm1btn" class="row"></button>
+  <button onclick="callEmergency(2)" id="confirm2btn" class="row"></button>
   <button onclick="closeConfirm()" class="alt row">İptal</button>
 </div>
 
 <script>
 const LS = localStorage;
-let izinler = JSON.parse(LS.getItem("izinler") || "{}");
+let izinler = JSON.parse(LS.getItem("izinler") || '{"konum":false,"motion":false,"notif":false,"bt":false}');
 LS.setItem("izinler", JSON.stringify(izinler));
 
 async function getFP(){
@@ -94,47 +105,40 @@ function warn(msg){
   document.getElementById("alerts").innerHTML += `<div class="alert">${msg}</div>`;
 }
 
+function openSettings(){
+  showPanel("settingsPanel");
+  const perms = JSON.parse(LS.getItem("izinler"));
+  document.getElementById("settingsPerms").innerText = JSON.stringify(perms, null, 2);
+  if(!perms.konum) warn("Konum izni yok → Konum paylaşımı çalışmaz");
+  if(!perms.notif) warn("Bildirim izni yok → Bildirimler kapalı");
+  if(!perms.bt) warn("Bluetooth izni yok → Saat fonksiyonu kapalı");
+  if(!perms.motion) warn("İvme sensörü izni yok → Düşme analizi kapalı");
+  document.getElementById("settingsProfile").innerText = LS.getItem("profile") || "Henüz profil kaydedilmemiş.";
+}
+
+function editProfile(){
+  const p = JSON.parse(LS.getItem("profile")||"{}");
+  document.getElementById("ad").value = p.ad || "";
+  document.getElementById("acil1ad").value = p.acil1?.ad || "";
+  document.getElementById("acil1tel").value = p.acil1?.tel || "";
+  document.getElementById("acil2ad").value = p.acil2?.ad || "";
+  document.getElementById("acil2tel").value = p.acil2?.tel || "";
+  showPanel("profilePanel");
+}
+
+function closeSettings(){
+  showPanel("mainPanel");
+}
+
 function showPanel(id){
-  ["permPanel","profilePanel","mainPanel","confirmBox"].forEach(p=>{
+  ["permPanel","profilePanel","mainPanel","settingsPanel","confirmBox"].forEach(p=>{
     document.getElementById(p).style.display="none";
   });
   document.getElementById(id).style.display="block";
 }
 
-async function permissionsDone(){
-  const fp = await getFP();
-  document.getElementById("deviceBox").innerText = "Cihaz Kimliği: " + fp;
+function permissionsDone(){
   showPanel("profilePanel");
-}
-
-async function requestGPS(){
-  navigator.geolocation.getCurrentPosition(()=>{
-    izinler.konum=true;
-    LS.setItem("izinler", JSON.stringify(izinler));
-    console.log("Konum izni ✔");
-  }, ()=> warn("Konum izni verilmedi → Konum fonksiyonu kapalı olur."));
-}
-
-async function requestNotif(){
-  const r = await Notification.requestPermission();
-  if(r==="granted"){ izinler.notif=true; LS.setItem("izinler", JSON.stringify(izinler)); }
-  else warn("Bildirim izni yok → Bildirim fonksiyonu kapalı olur.");
-}
-
-async function requestBT(){
-  if(!navigator.bluetooth){ return warn("Bluetooth yok → saat fonksiyonu kapalı olur."); }
-  try{ await navigator.bluetooth.requestDevice({acceptAllDevices:true}); izinler.bt=true; LS.setItem("izinler", JSON.stringify(izinler)); }
-  catch{ warn("Bluetooth izni verilmedi → saat fonksiyonu kapalı olur."); }
-}
-
-function checkSensors(){
-  if(!window.DeviceMotionEvent){
-    document.getElementById("sensorResult").innerText="İvme sensörü desteklenmiyor ❗ Manuel panik çalışır";
-  } else {
-    document.getElementById("sensorResult").innerText="İvme sensörü destekleniyor ✔";
-    izinler.motion=true;
-    LS.setItem("izinler", JSON.stringify(izinler));
-  }
 }
 
 async function saveProfile(){
@@ -160,17 +164,13 @@ async function saveProfile(){
 }
 
 function showMainUI(){
-  showPanel("mainPanel");
-  showMainUI();
-}
-
-function showMainUI(){
   const p = JSON.parse(LS.getItem("profile")||"{}");
-  document.getElementById("status").innerText = "📡 İzleme aktif";
-  document.getElementById("acil1btn").innerText = `Acil 1: ${p.acil1?.ad} — Ara & Konum + Mesaj Gönder`;
+  document.getElementById("statusBox").innerText = `📡 Sistem Aktif | Kullanıcı: ${p.ad}`;
+  document.getElementById("acil1btn").style.display="block";
+  document.getElementById("acil1btn").innerText=`Acil 1: ${p.acil1.ad} — Ara & Konum + Mesaj Gönder`;
   if(p.acil2){
-    document.getElementById("acil2btn").innerText = `Acil 2: ${p.acil2.ad} — Ara & Konum + Mesaj Gönder`;
     document.getElementById("acil2btn").style.display="block";
+    document.getElementById("acil2btn").innerText=`Acil 2: ${p.acil2.ad} — Ara & Konum + Mesaj Gönder`;
   } else {
     document.getElementById("acil2btn").style.display="none";
   }
@@ -180,13 +180,15 @@ function showMainUI(){
 function panicConfirm(){
   const p = JSON.parse(LS.getItem("profile")||"{}");
   document.getElementById("confirmText").innerText =
-    `Acil Tetiklendi!\nKullanıcı: ${p.ad}\n${p.acil1?.ad}: ${p.acil1?.tel}\n${p.acil2?.ad||"-"}: ${p.acil2?.tel||"-"}`;
+    `🚨 ACİL Tetiklendi!\nKullanıcı: ${p.ad}\nAcil 1: ${p.acil1.ad} — ${p.acil1.tel}\nAcil 2: ${p.acil2?.ad||"-"} — ${p.acil2?.tel||"-"}`;
   document.getElementById("confirmBox").style.display="block";
+  document.getElementById("confirm1btn").innerText=`Acil 1: ${p.acil1.ad}`;
+  document.getElementById("confirm2btn").innerText=`Acil 2: ${p.acil2?.ad||"Kayıtlı değil"}`;
 }
 
 function callEmergency(n){
   const p = JSON.parse(LS.getItem("profile")||"{}");
-  const t = n===1 ? p.acil1?.tel : p.acil2?.tel;
+  const t = n===1 ? p.acil1.tel : p.acil2?.tel;
   if(!t) return alert("Acil kişi telefon kaydı yok!");
   location.href = `tel:${t}`;
   shareLocation(`Acil durum tahmini | ${p.ad}`, t);
@@ -203,9 +205,13 @@ async function shareLocation(msg, tel){
   });
 }
 
-window.onload = ()=>{
+window.onload = async ()=>{
   const p = LS.getItem("profile");
-  if(p){ showMainUI(); } else { showPanel("permPanel"); }
+  if(p){
+    showMainUI();
+  } else {
+    showPanel("permPanel");
+  }
 }
 </script>
 
