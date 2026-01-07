@@ -6,197 +6,182 @@
 <title>HG Acil</title>
 <style>
 body{font-family:sans-serif;padding:20px;margin:0;background:#fff;color:#111}
-input{width:100%;padding:14px;font-size:17px;border-radius:10px;border:1px solid #777;margin-top:6px}
-button{width:100%;padding:20px;font-size:18px;background:#d33;color:#fff;border:none;border-radius:12px;margin-top:12px;font-weight:600;cursor:pointer}
-button.alt{background:#444}
-.alert{background:#fffae0;border-left:4px solid #e6a700;padding:12px;border-radius:8px;margin-top:12px;font-size:15px}
-.panel{padding:16px;background:#f4f4f4;border-radius:12px;margin-bottom:14px}
-#panicBtn{background:#d33;font-size:22px;padding:26px;color:#fff;border-radius:12px;border:none;font-weight:600;margin-top:20px;width:100%}
+input{width:100%;padding:12px;font-size:16px;border-radius:8px;border:1px solid #555;margin-top:6px}
+button{width:100%;padding:18px;font-size:18px;background:#c00;color:#fff;border:none;border-radius:10px;margin-top:12px;font-weight:600;cursor:pointer}
+button.alt{background:#222}
+.alert{background:#fff3cd;border-left:4px solid #ffb300;padding:12px;border-radius:6px;margin-top:12px;font-size:14px}
+.panel{padding:16px;background:#f2f2f2;border-radius:10px;margin-bottom:14px}
+#panicBtn{background:#c00;font-size:22px;padding:26px;border-radius:12px;width:100%;font-weight:700}
 #confirmBox{display:none;position:fixed;top:30%;left:5%;width:90%;background:#fff;padding:16px;border-radius:12px;box-shadow:0 0 16px rgba(0,0,0,0.3)}
 </style>
 </head>
 <body>
 
-<h2>Hızır Gibi — ACİL Güven</h2>
+<h2>Hızır Gibi — Acil Durum İzleme</h2>
 <div id="alerts"></div>
 
-<!-- İzin Paneli (aktif kalıyor, atlamıyor) -->
+<!-- İzin Paneli -->
 <div id="permPanel" class="panel">
   <h3>Gerekli İzinler</h3>
-  <p>Hayati acil analiz ve anlık veri takibi için aşağıdaki izinleri verin:</p>
-  <button onclick="requestGPS()">📍 Konum izni ver</button>
-  <button onclick="requestMotion()">📱 Hareket sensörü izni ver</button>
-  <button onclick="requestNotif()">🔔 Bildirim izni ver</button>
-  <button onclick="requestBT()">⌚ Bluetooth izni ver (Akıllı saat için)</button>
-  <button class="perm alt" onclick="allPermsDone()">İzinler tamam, profile geç</button>
+  <button onclick="requestGPS()">📍 Konum İzni</button>
+  <button onclick="requestNotif()">🔔 Bildirim İzni</button>
+  <button onclick="requestBT()">⌚ Bluetooth İzni</button>
+  <button class="alt" onclick="checkSensors()">📱 Sensörleri Kontrol Et</button>
+  <button class="alt" onclick="permissionsDone()">İzinleri Bitir & Profile Geç</button>
 </div>
 
 <!-- Profil Paneli -->
 <div id="profilePanel" class="panel" style="display:none">
   <h3>Acil Profil</h3>
   <label>Ad Soyad</label>
-  <input id="ad" placeholder="Ad Soyad"/>
-  <label style="margin-top:12px;display:block">Acil kişi telefonu</label>
-  <input id="tel" placeholder="05xx xxx xx xx"/>
-  <label style="margin-top:12px;display:block">Lisans kodu (trial için boş bırak)</label>
-  <input id="license" placeholder="HG-2027-12-31-XXXXX"/>
-  <div id="fpBox" style="margin-top:10px;font-size:13px;color:#333"></div>
-  <button onclick="activateSystem()">Kaydet & Başlat</button>
+  <input id="ad" placeholder="Ad Soyad Gir"/>
+  <label>Acil Kişi 1 (Telefon)</label>
+  <input id="tel1" placeholder="05xx xxx xx xx"/>
+  <label>Acil Kişi 2 (Telefon)</label>
+  <input id="tel2" placeholder="05xx xxx xx xx"/>
+  <button onclick="saveProfile()">Kaydet & Başlat</button>
+  <button class="alt" onclick="openSettings()">Ayarlar</button>
 </div>
 
 <!-- Ana Sistem Paneli -->
 <div id="mainPanel" class="panel" style="display:none">
   <h3>Sistem Aktif</h3>
-  <div id="status" class="alert">📡 Acil durum izleme sistemi hazır.</div>
+  <div id="status" class="alert">📡 Sistem izleme aktif değil…</div>
   <button id="panicBtn" onclick="panicConfirm()">ACİL</button>
 </div>
 
-<!-- 112 Arama Onayı -->
+<!-- 112 ve Acil Kişiler Onay Paneli -->
 <div id="confirmBox">
   <div id="confirmText"></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
-    <button onclick="call112()">📞 112’yi Ara</button>
+    <button onclick="call112()">📞 112</button>
+    <button onclick="callEmergency(1)">👤 Acil Kişi 1</button>
+    <button onclick="callEmergency(2)">👤 Acil Kişi 2</button>
     <button onclick="closeConfirm()" class="alt">İptal</button>
   </div>
 </div>
 
 <script>
 const LS = localStorage;
-let izinler = JSON.parse(LS.getItem("izinler") || '{"konum":false,"motion":false,"notif":false,"bt":false}');
+let izinler = JSON.parse(LS.getItem("izinler") || '{"konum":false,"notif":false,"bt":false}');
 LS.setItem("izinler", JSON.stringify(izinler));
 
-// Uyarı bas
-function warnUI(msg){
-  document.getElementById("alerts").innerHTML += `<div class="alert">${msg}</div>`;
-}
-
-// İzinler tamamlandı → profile geçme butonu aktif olur ama otomatik geçiş yapmaz
-function allPermsDone(){
-  showPanel("profilePanel");
-}
-
-// UI panel geçişi (butonları kapatmıyor artık)
 function showPanel(id){
   document.getElementById("permPanel").style.display="none";
   document.getElementById("profilePanel").style.display="none";
   document.getElementById("mainPanel").style.display="none";
+  document.getElementById("confirmBox").style.display="none";
   document.getElementById(id).style.display="block";
 }
 
-// Fingerprint üret
-async function getFP(){
-  const data = navigator.userAgent + screen.width + screen.height + Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(data));
-  return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,"0")).join("");
+function warn(msg){
+  document.getElementById("alerts").innerHTML += `<div class="alert">⚠ ${msg}</div>`;
 }
 
-// Konum izni
+function permissionsDone(){ showPanel("profilePanel"); }
+
 async function requestGPS(){
-  navigator.geolocation.getCurrentPosition(async ()=>{
-    izinler.konum = true;
-    LS.setItem("gpsOK","1");
+  navigator.geolocation.getCurrentPosition(()=>{
+    izinler.konum=true;
     LS.setItem("izinler", JSON.stringify(izinler));
-    document.getElementById("fpBox").innerText = "Cihaz Kimliği: " + await getFP();
-  }, ()=>{
-    warnUI("Konum izni yok → Konum takibi ve otomatik konum paylaşımı çalışmaz.");
-  });
+    console.log("Konum izni alındı ✔");
+  }, ()=> warn("Konum izni verilmedi → Konum fonksiyonu kapalı."));
 }
 
-// Hareket sensörü izni
-async function requestMotion(){
-  if(DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === "function"){
-    const r = await DeviceMotionEvent.requestPermission();
-    if(r==="granted"){
-      izinler.motion = true;
-      LS.setItem("motionOK","1");
-      LS.setItem("izinler", JSON.stringify(izinler));
-      console.log("Motion izni alındı ✔");
-    } else {
-      warnUI("Hareket sensörü izni yok → düşme/çarpma analizi kapalı olur.");
-    }
-  } else {
-    warnUI("Hareket sensörü bu cihaz/tarayıcıda desteklenmiyor.");
-  }
-}
-
-// Bildirim izni
 async function requestNotif(){
   const r = await Notification.requestPermission();
-  if(r==="granted"){
-    izinler.notif = true;
-    LS.setItem("notifOK","1");
-    LS.setItem("izinler", JSON.stringify(izinler));
-    console.log("Bildirim izni alındı ✔");
-  } else {
-    warnUI("Bildirim izni yok → Bildirim fonksiyonu kapalı olur.");
-  }
+  if(r==="granted"){ izinler.notif=true; LS.setItem("izinler", JSON.stringify(izinler)); console.log("Bildirim izni alındı ✔"); }
+  else warn("Bildirim izni yok → Bildirim fonksiyonu kapalı.");
 }
 
-// Bluetooth izni
 async function requestBT(){
-  if(!navigator.bluetooth){
-    warnUI("Bluetooth yok → Akıllı saat veri alma fonksiyonu çalışmaz.");
-    return;
-  }
-  try{
-    await navigator.bluetooth.requestDevice({acceptAllDevices:true});
-    izinler.bt = true;
-    LS.setItem("btOK","1");
-    LS.setItem("izinler", JSON.stringify(izinler));
-    console.log("Bluetooth izni alındı ✔");
-  }catch{
-    warnUI("Bluetooth izni verilmedi → saat veri alma kapalı olur.");
-  }
+  if(!navigator.bluetooth) return warn("Bluetooth yok → Saat fonksiyonu kapalı.");
+  try{ await navigator.bluetooth.requestDevice({acceptAllDevices:true}); izinler.bt=true; LS.setItem("izinler", JSON.stringify(izinler)); console.log("Bluetooth izni alındı ✔"); }
+  catch{ warn("Bluetooth izni verilmedi → Saat fonksiyonu kapalı."); }
 }
 
-// Panik 112 onayı
+function checkSensors(){
+  if(!window.DeviceMotionEvent) warn("İvme/Hareket sensörü desteklenmiyor → Düşme/çarpma analizi çalışmaz, manuel panik çalışır.");
+  else console.log("Sensör desteği var ✔");
+}
+
+async function saveProfile(){
+  const ad=document.getElementById("ad").value.trim();
+  const tel1=document.getElementById("tel1").value.trim();
+  const tel2=document.getElementById("tel2").value.trim();
+
+  if(!ad || !tel1) return alert("Ad ve en az 1 acil kişi zorunlu!");
+
+  LS.setItem("profile", JSON.stringify({ad,tel1,tel2}));
+  LS.setItem("panicLock","1");
+  showPanel("mainPanel");
+  startLoops();
+  console.log("Profil kaydedildi ✔");
+}
+
 function panicConfirm(){
-  document.getElementById("confirmText").innerText = "112 aranabilir. Aramayı başlatmak için onay verin.";
+  const p = JSON.parse(LS.getItem("profile")||"{}");
+  document.getElementById("confirmText").innerText = `Acil tetik: Profil ${p.ad}\n1: ${p.tel1}\n2: ${p.tel2||"-"}`;
   document.getElementById("confirmBox").style.display="block";
 }
 
-// 112 yönlendirme
+function callEmergency(n){
+  const p = JSON.parse(LS.getItem("profile")||"{}");
+  const tel = n===1 ? p.tel1 : p.tel2;
+  if(!tel) return alert("Bu kişi kayıtlı değil!");
+  location.href = `tel:${tel}`;
+  shareLocation(`Acil durum tahmini | ${p.ad}`, tel);
+}
+
 function call112(){ location.href="tel:112"; }
+
 function closeConfirm(){ document.getElementById("confirmBox").style.display="none"; }
 
-// GPS + pil izleme (profil kaydedilince başlat)
+function startLoops(){
+  if(izinler.konum) navigator.geolocation.watchPosition(p=>{
+    LS.setItem("lastLoc", JSON.stringify(p.coords));
+    document.getElementById("status").innerText = `📍 ${p.coords.latitude.toFixed(5)}, ${p.coords.longitude.toFixed(5)}`;
+  });
+}
+
+function startBatteryLoop(){
+  navigator.getBattery().then(b=>{
+    setInterval(()=>{
+      const lvl = Math.round(b.level*100);
+      LS.setItem("battery", lvl);
+      if(lvl===5) shareLocation("🔋 Şarjım %5", null);
+      if(lvl===1) shareLocation("🔋 Şarjım %1", null);
+    },60000);
+  });
+}
+
+function startLoops(){ startGPSWatch(); startBatteryLoop(); }
+
 function startGPSWatch(){
-  if(!izinler.konum) return;
   navigator.geolocation.watchPosition(p=>{
     const {latitude, longitude, speed} = p.coords;
-    const kmh = speed ? Math.round(speed * 3.6) : 0;
+    const kmh = speed ? Math.round(speed*3.6) : 0;
     const msg = `📍 ${latitude.toFixed(5)}, ${longitude.toFixed(5)} | ${kmh} km/h`;
     document.getElementById("status").innerText = msg;
-  }, ()=> warnUI("Konum kesildi → Konum takibi durdu."), {enableHighAccuracy:true});
+  }, ()=> warn("Konum takibi durdu."), {enableHighAccuracy:true});
 }
 
 function startBatteryLoop(){
   navigator.getBattery().then(b=>{
     b.onlevelchange = ()=>{
-      const lvl = Math.round(b.level * 100);
+      const lvl = Math.round(b.level*100);
       console.log("Pil:", lvl);
-      if(lvl <= 5) sendSMS(`Şarjım %${lvl} kritik!`, LS.getItem("acilTel"));
-      if(lvl <= 1) sendSMS("Şarjım %1 hayati kritik!", LS.getItem("acilTel"));
+      if(lvl<=5) shareLocation(`🔋 Şarjım %${lvl}`, LS.getItem("acilTel"));
     }
   });
 }
 
-// SMS fonksiyonu
-function sendSMS(msg,tel){ if(tel) location.href=`sms:${tel}?body=${encodeURIComponent(msg)}`; }
-
-// Profil kaydedilince sistem aktive olur
-async function activateSystem(){
-  const ad=document.getElementById("ad").value.trim();
-  const tel=document.getElementById("tel").value.trim();
-  const fp = await getFP();
-
-  if(!ad || !tel) return alert("Ad ve acil kişi telefonu zorunlu!");
-
-  LS.setItem("profile", JSON.stringify({ad,tel,fp}));
-  LS.setItem("acilTel", tel);
-  showPanel("mainPanel");
-  startGPSWatch();
-  startBatteryLoop();
+async function shareLocation(msg, tel){
+  if(!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(p=>{
+    const text = msg + (tel?` → ${tel}`:"") + ` | Harita: ` + `maps:${p.coords.latitude},${p.coords.longitude}`;
+    if(tel) location.href=`sms:${tel}?body=${encodeURIComponent(text)}`;
+  });
 }
 </script>
 
