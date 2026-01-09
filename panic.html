@@ -1,163 +1,170 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>HG ACİL</title>
-<style>
-  body{font-family:sans-serif;padding:18px;margin:0;background:#fff;color:#111;text-align:center}
-  #panicBtn{width:100%;padding:22px;font-size:21px;background:#d33;color:#fff;border:none;border-radius:12px;margin-top:14px;font-weight:600;cursor:pointer}
-  .contactBtn{width:100%;padding:16px;font-size:17px;background:#222;color:#fff;border:none;border-radius:10px;margin-top:10px;cursor:pointer;font-weight:600}
-  #logBox{background:#000;color:#fff;font-size:14px;padding:12px;border-radius:8px;margin-top:14px;min-height:50px;white-space:pre-wrap}
-  .warn{background:#ffefc2;padding:10px;border-left:3px solid #e6a700;border-radius:6px;margin-top:12px;font-size:13px;width:100%;text-align:left}
-  #settingsPanel,#permPanel,#profilePanel,#confirmPanel{display:none;padding:14px;background:#f5f5f5;border-radius:10px;margin-top:14px;text-align:left;width:100%}
-  .topbar{display:flex;gap:8px;margin-bottom:12px}
-  .topbar button{padding:12px;font-size:15px;border-radius:8px;margin:0;background:#222;color:#fff;width:auto;flex:1;cursor:pointer}
-</style>
-</head>
-<body>
+<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HG Acil</title><style>
+body{font-family:sans-serif;padding:18px;margin:0;background:#fff;color:#111;text-align:center}
+button{width:100%;padding:18px;font-size:18px;background:#d33;color:#fff;border:none;border-radius:10px;margin-top:12px;font-weight:600;cursor:pointer}
+.topbar{display:flex;gap:8px;margin-bottom:12px}
+.topbar button{padding:14px;font-size:15px;border-radius:8px;margin:0;background:#222;color:#fff;width:auto;flex:1}
+.panel{display:none;background:#eee;padding:14px;border-radius:8px;margin-top:14px;text-align:left;font-size:14px}
+.warn{background:#fff3cd;padding:10px;border-left:4px solid #e6a700;border-radius:6px;margin-top:12px;font-size:13px;color:#b00}
+#logBox{background:#000;color:#fff;font-size:13px;padding:12px;border-radius:8px;margin-top:14px;min-height:40px;white-space:pre-wrap;text-align:left}
+input{width:100%;padding:10px;font-size:15px;border-radius:6px;border:1px solid #444;margin-top:4px}
+.contactBtn{width:100%;padding:16px;font-size:17px;background:#222;color:#fff;border:none;border-radius:10px;margin-top:10px;font-weight:600;cursor:pointer}
+</style></head><body>
 
-<h2>Acil Durum İzleme</h2>
+<h2>HG Acil Durum</h2>
 
 <div class="topbar">
-  <button onclick="toggleSettings()">⚙ Ayarlar</button>
-  <button onclick="togglePerms()">📌 İzinler</button>
+  <button id="btnSettings">⚙ Ayarlar</button>
+  <button id="btnPerms">📌 İzinler</button>
 </div>
 
-<button id="panicBtn" onclick="panic()">ACİL</button>
+<button id="panicBtn">🚨 ACİL</button>
 
 <div id="contacts"></div>
 
-<div><strong>Canlı Log</strong><div id="logBox"></div></div>
+<div><strong>Canlı Log</strong><div id="logBox">Sistem bekliyor…</div></div>
 
-<!-- AYARLAR -->
-<div id="settingsPanel">
-  <h3>⚙ Ayarlar</h3>
-  <div id="settingsProfile" class="warn"></div>
-  <div id="settingsPerms" class="warn"></div>
-  <button class="alt" onclick="editProfile()">✏ Profili Düzenle</button>
-  <button class="alt" onclick="closeSettings()">⬅ Ana Ekrana Dön</button>
-</div>
-
-<!-- İZİNLER -->
-<div id="permPanel">
+<!-- İzin Panel -->
+<div id="permPanel" class="panel">
   <h3>Gerekli İzinler</h3>
-  <button onclick="requestGPS()">📍 Konum izni</button>
-  <button onclick="requestMotion()">📱 İvme sensörü izni</button>
-  <button onclick="requestNotif()">🔔 Bildirim izni</button>
-  <button onclick="requestBT()">⌚ Bluetooth izni</button>
-  <div id="permResult" class="warn"></div>
-  <button onclick="togglePerms()" class="alt">Kapat</button>
+  <button id="permGPS">📍 Konum İzni</button>
+  <button id="permNotif" class="alt">🔔 Bildirim İzni</button>
+  <button id="permBT" class="alt">⌚ Bluetooth İzni</button>
+  <button id="permMotion" class="alt">📱 Hareket/İvme İzni</button>
+  <button id="permClose" class="alt">Kapat</button>
+  <div id="permResult"></div>
 </div>
 
-<!-- PROFİL -->
-<div id="profilePanel">
+<!-- Ayarlar Panel -->
+<div id="settingsPanel" class="panel">
+  <h3>⚙ Ayarlar</h3>
+  <div id="settingsProfile"></div>
+  <div id="settingsPerms"></div>
+  <button id="settingsClose" class="alt">Kapat</button>
+</div>
+
+<!-- Profil Panel -->
+<div id="profilePanel" class="panel">
   <h3>Acil Profil</h3>
-  <input id="ad" placeholder="Ad Soyad"/>
-  <input id="acil1ad" placeholder="Acil kişi 1 isim"/>
-  <input id="acil1tel" placeholder="Acil kişi 1 telefon"/>
-  <input id="acil2ad" placeholder="Acil kişi 2 isim"/>
-  <input id="acil2tel" placeholder="Acil kişi 2 telefon"/>
-  <button onclick="saveProfile()">Kaydet & Başlat</button>
+  <label>Ad Soyad</label>
+  <input id="ad"/>
+  <label>Acil Kişi 1</label>
+  <input id="acil1ad"/>
+  <input id="acil1tel"/>
+  <label>Acil Kişi 2 (opsiyon)</label>
+  <input id="acil2ad"/>
+  <input id="acil2tel"/>
+  <button id="profileSave">Kaydet & Başlat</button>
+  <button id="profileClose" class="alt">Kapat</button>
+</div>
+
+<!-- Confirm Panel -->
+<div id="confirmPanel" class="panel">
+  <h3>🚨 Acil Onay</h3>
+  <button id="confirm112">112'yi Ara</button>
+  <button id="confirm1"></button>
+  <button id="confirm2"></button>
+  <button id="confirmCancel" class="alt">İptal</button>
 </div>
 
 <script>
 const LS = localStorage;
 
-function toggleSettings(){
-  const p=document.getElementById("settingsPanel");
-  if(p) p.style.display=p.style.display==="block"?"none":"block";
-  if(p.style.display==="block") openSettings();
+// Panel aç/kapat kontrol
+function showPanel(id){ document.getElementById(id).style.display="block"; }
+function hidePanel(id){ document.getElementById(id).style.display="none"; }
+
+// Settings panel fonksiyonunu düzelt ve bağla
+function openSettings(){
+  const p = JSON.parse(LS.getItem("profile")||"{}");
+  const perms = JSON.parse(LS.getItem("izinler")||"{}");
+  document.getElementById("settingsProfile").innerText = p.ad ? `Kullanıcı: ${p.ad}\nAcil 1: ${p.acil1?.ad} (${p.acil1?.tel})\nAcil 2: ${p.acil2?.ad||"—"}` : "Profil yok";
+  document.getElementById("settingsPerms").innerText = `Konum: ${perms.gps?"Açık":"Kapalı"} | Bildirim: ${perms.notif?"Açık":"Kapalı"} | Bluetooth: ${perms.bt?"Açık":"Kapalı"} | İvme: ${perms.motion?"Açık":"Kapalı"}`;
 }
 
-function closeSettings(){ document.getElementById("settingsPanel").style.display="none"; }
-
-function togglePerms(){
-  const p=document.getElementById("permPanel");
-  if(p) p.style.display=p.style.display==="block"?"none":"block";
-}
-
-let izinler = JSON.parse(LS.getItem("izinler") || `{"gps":false,"motion":false,"notif":false,"bt":false,"sms":false}`);
-
-async function requestMotion(){
-  if(!window.DeviceMotionEvent) return;
-  if(typeof DeviceMotionEvent.requestPermission==="function"){
-    const r=await DeviceMotionEvent.requestPermission();
-    if(r==="granted") izinler.motion=true;
-  } else izinler.motion=true;
-  LS.setItem("izinler",JSON.stringify(izinler));
-}
-
-async function requestGPS(){
-  navigator.geolocation?.getCurrentPosition(p=>{
-    izinler.gps=true;
-    LS.setItem("izinler",JSON.stringify(izinler));
-    document.getElementById("permResult").innerText="📍 Konum izni alındı ✔ Lat:"+p.coords.latitude;
-  });
-}
-
-async function requestNotif(){
-  const r=await Notification?.requestPermission();
-  if(r==="granted") izinler.notif=true;
-  LS.setItem("izinler",JSON.stringify(izinler));
-}
-
-async function requestBT(){
-  try{ await navigator.bluetooth?.requestDevice({acceptAllDevices:true}); izinler.bt=true; }
-  catch{}
-  LS.setItem("izinler",JSON.stringify(izinler));
-}
-
-async function saveProfile(){
-  const ad=document.getElementById("ad").value.trim();
-  const a1=document.getElementById("acil1ad").value.trim();
-  const t1=document.getElementById("acil1tel").value.trim();
-  const a2=document.getElementById("acil2ad").value.trim();
-  const t2=document.getElementById("acil2tel").value.trim();
-  if(!ad||!a1||!t1) return alert("Eksik alan ❌");
-  const fp = await getFP();
-  const obj={ad,fp,acil1:{ad:a1,tel:t1},acil2:a2&&t2?{ad:a2,tel:a2}:null};
-  LS.setItem("profile",JSON.stringify(obj));
-  LS.setItem("izinler",JSON.stringify(izinler));
-  bindButtons();
-  alert("Kaydedildi ✔");
-}
-
-function panic(){ location.href="tel:112"; }
-
-function acil(n){
-  const p=JSON.parse(LS.getItem("profile"));
-  const c = n===1 ? p.acil1 : p.acil2;
-  if(!c?.tel) return alert("Acil kişi yok ❌");
-  location.href="tel:"+c.tel;
-  navigator.geolocation?.getCurrentPosition(pos=>{
-    const locLink = "https://maps.google.com/?q=" + pos.coords.latitude + "," + pos.coords.longitude;
-    const msg=`🚨 ACİL | ${p.ad}\nKonum: ${locLink}\nHız: 0 m/s (test)\nİvme: 0 g (test)`;
-    location.href="sms:"+c.tel+"?body="+encodeURIComponent(msg);
-    navigator.share?.({title:"Acil",text:msg});
-    updateLogUI("📤 Mesaj gönderildi ✔ " + c.ad);
-  });
-}
-
+// Log alanı max 2 satır + refresh
 let logLines=[];
 function updateLogUI(m){
   if(logLines.length>=2) logLines.shift();
   logLines.push(m);
   document.getElementById("logBox").innerText = logLines.join("\n");
+  console.log(m);
 }
 
-function editProfile(){ showPanel("profilePanel"); }
-
-window.onload = ()=>{ if(LS.getItem("profile")) bindButtons(); }
-
-function bindButtons(){
-  const p=JSON.parse(LS.getItem("profile")||"{}");
-  if(!p.ad) return;
-  document.getElementById("contacts").innerHTML =
-    `<button class="contactBtn" onclick="acil(1)">Acil 1: ${p.acil1.ad}</button>` +
-    (p.acil2?`<button class="contactBtn" onclick="acil(2)">Acil 2: ${p.acil2.ad}</button>`:"");
+// Acil kişileri butonlara bağla
+function bindEmergencyButtons(){
+  const p = JSON.parse(LS.getItem("profile")||"null");
+  if(!p) return false;
+  let html = `<button class="contactBtn" onclick="acil(1)">Acil 1: ${p.acil1.ad}</button>`;
+  if(p.acil2) html += `<button class="contactBtn" onclick="acil(2)">Acil 2: ${p.acil2.ad}</button>`;
+  document.getElementById("contacts").innerHTML = html;
+  return true;
 }
+
+// İzinleri almayı UI’a bağla
+document.getElementById("permGPS").onclick = ()=>navigator.geolocation?.getCurrentPosition(p=>{
+  izinler.gps=true;
+  LS.setItem("izinler",JSON.stringify(izinler));
+  document.getElementById("permResult").innerText="📍 Konum izni alındı ✔ Lat:"+p.coords.latitude;
+});
+
+document.getElementById("permNotif").onclick = async ()=>{const r=await Notification?.requestPermission(); izinler.notif=r==="granted"; LS.setItem("izinler",JSON.stringify(izinler)); document.getElementById("permResult").innerText="🔔 Bildirim:"+r;}
+
+document.getElementById("permBT").onclick = async ()=>{try{await navigator.bluetooth?.requestDevice({acceptAllDevices:true}); izinler.bt=true; LS.setItem("izinler",JSON.stringify(izinler)); document.getElementById("permResult").innerText="⌚ BT izni ✔";}catch{document.getElementById("permResult").innerText="BT izni ❌";}}
+
+document.getElementById("permMotion").onclick = async ()=>{if(!window.DeviceMotionEvent){document.getElementById("permResult").innerText="İvme sensörü ❗";return;} if(typeof DeviceMotionEvent.requestPermission==="function"){const r=await DeviceMotionEvent.requestPermission(); if(r==="granted") izinler.motion=true;} else izinler.motion=true; LS.setItem("izinler",JSON.stringify(izinler)); document.getElementById("permResult").innerText="📱 İvme izni ✔";}
+
+// Panel kapat
+document.getElementById("permClose").onclick = ()=>hidePanel("permPanel");
+document.getElementById("settingsClose").onclick = ()=>hidePanel("settingsPanel");
+document.getElementById("settingsClose").onclick = ()=>hidePanel("settingsPanel");
+
+// Profil kaydet
+async function saveProfile(){
+  const ad=document.getElementById("ad").value.trim();
+  const a1=document.getElementByElementById("acil1ad").value.trim();
+  const t1=document.getElementById("acil1tel").value.trim();
+  const a2=document.getElementById("acil2ad").value.trim();
+  const t2=document.getElementById("acil2tel").value.trim();
+  if(!ad||!a1||!t1) return alert("Eksik ❌");
+  const obj={ad,acil1:{ad:a1,tel:t1},acil2:a2&&t2?{ad:a2,tel:a2}:null};
+  LS.setItem("profile",JSON.stringify(obj));
+  LS.setItem("izinler",JSON.stringify(izinler));
+  bindEmergencyButtons();
+  alert("Profil kaydedildi ✔");
+}
+
+// Kaydet & Başlat butonunu bağla
+document.getElementById("profileSave").onclick = ()=>saveProfile();
+
+// ACİL akış butonu
+document.getElementById("panicBtn").onclick = ()=>{
+  if(!LS.getItem("profile")){alert("Önce profil kaydet!");showPanel("profilePanel");return;}
+  showPanel("confirmPanel");
+  const p=JSON.parse(LS.getItem("profile"));
+  document.getElementById("confirm1").innerText = "Acil 1: " + p.acil1.ad;
+  document.getElementById("confirm2").innerText = p.acil2?("Acil 2: " + p.acil2.ad):"";
+};
+
+// Confirm butonları
+document.getElementById("confirm112").onclick = ()=>location.href="tel:112";
+document.getElementById("confirmCancel").onclick = ()=>hidePanel("confirmPanel");
+
+// Emergency kişi akışı
+window.acil = async function(n){
+  const p=JSON.parse(LS.getItem("profile"));
+  const c = n===1 ? p.acil1 : p.acil2;
+  if(!c?.tel) return alert("Acil kişi yok ❌");
+  location.href="tel:"+c.tel;
+  navigator.geolocation?.getCurrentPosition(pos=>{
+    const locLink = pos.coords.latitude + "," + pos.coords.longitude;
+    const msg=`🚨 ACİL | ${p.ad}\nKonum: https://maps.google.com/?q=${locLink}`;
+    location.href="sms:"+c.tel+"?body="+encodeURIComponent(msg);
+    navigator.share?.({title:"Acil",text:msg});
+    updateLogUI("📤 "+c.ad+" bilgilendirildi ✔");
+  });
+};
+
+window.onload = ()=>{ bindEmergencyButtons(); updateLogUI("Sistem hazır ✔"); }
 </script>
 
-</body>
-</html>
+</body></html>
