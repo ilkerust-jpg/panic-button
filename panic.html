@@ -15,6 +15,7 @@ button{width:100%;padding:22px;font-size:21px;font-weight:700;border:none;border
 .panel{display:none;background:#f0f0f0;padding:14px;border-radius:10px;margin-top:14px;text-align:left}
 input{width:100%;padding:10px;font-size:15px;border-radius:6px;border:1px solid #444;margin-top:6px}
 .warn{background:#ffefc2;padding:10px;border-left:4px solid #e6a700;border-radius:6px;margin-top:10px;font-size:13px}
+.status{font-size:13px;margin-top:6px}
 #logBox{background:#000;color:#fff;font-size:13px;padding:10px;border-radius:8px;margin-top:14px;text-align:left;min-height:40px}
 </style>
 </head>
@@ -36,10 +37,14 @@ input{width:100%;padding:10px;font-size:15px;border-radius:6px;border:1px solid 
 <!-- İZİNLER -->
 <div id="permPanel" class="panel">
   <h3>İzinler</h3>
+
   <button id="permGPS">📍 Konum</button>
+  <div id="gpsStatus" class="status"></div>
+
   <button id="permNotif">🔔 Bildirim</button>
+  <div id="notifStatus" class="status"></div>
+
   <button id="permClose">Kapat</button>
-  <div id="permResult" class="warn"></div>
 </div>
 
 <!-- AYARLAR -->
@@ -64,25 +69,37 @@ const LS = localStorage;
 const HOLD = 1200;
 let timer=null;
 
-function log(m){logBox.innerText=m;}
-function show(p){p.style.display="block";}
-function hide(p){p.style.display="none";}
+function log(m){ logBox.innerText=m; }
+function show(p){ p.style.display="block"; }
+function hide(p){ p.style.display="none"; }
 
-function hold(btn,fn){
-  btn.addEventListener("mousedown",()=>timer=setTimeout(fn,HOLD));
-  btn.addEventListener("touchstart",()=>timer=setTimeout(fn,HOLD));
-  ["mouseup","mouseleave","touchend","touchcancel"].forEach(e=>{
-    btn.addEventListener(e,()=>clearTimeout(timer));
-  });
+function bindHold(btn,fn){
+  const start=()=>timer=setTimeout(fn,HOLD);
+  const stop=()=>clearTimeout(timer);
+  ["mousedown","touchstart"].forEach(e=>btn.addEventListener(e,start));
+  ["mouseup","mouseleave","touchend","touchcancel"].forEach(e=>btn.addEventListener(e,stop));
 }
 
-/* PROFİL */
+/* ==== PERMISSIONS STATE ==== */
+function loadPermStatus(){
+  gpsStatus.innerText = navigator.geolocation ? "Konum API mevcut" : "Konum API yok";
+  notifStatus.innerText = "Bildirim: " + Notification.permission;
+}
+
+/* ==== PROFILE ==== */
 function loadProfile(){
-  const p=JSON.parse(LS.getItem("profile")||"null");
-  if(p) log("Profil yüklü");
+  const p = JSON.parse(LS.getItem("profile")||"null");
+  if(!p) return;
+  name.value = p.name;
+  emName.value = p.emName;
+  emTel.value = p.emTel;
 }
+
 saveProfile.onclick=()=>{
-  if(!name.value||!emTel.value){alert("Eksik bilgi");return;}
+  if(!name.value || !emTel.value){
+    alert("Eksik bilgi");
+    return;
+  }
   LS.setItem("profile",JSON.stringify({
     name:name.value,
     emName:emName.value,
@@ -92,40 +109,52 @@ saveProfile.onclick=()=>{
   log("Profil kaydedildi");
 };
 
-/* AYARLAR */
+/* ==== SETTINGS ==== */
 btnSettings.onclick=()=>{
   const p=JSON.parse(LS.getItem("profile")||"{}");
-  settingsInfo.innerText=p.name?`${p.name}\nAcil: ${p.emName} (${p.emTel})`:"Profil yok";
+  settingsInfo.innerText = p.name
+    ? `${p.name}\nAcil: ${p.emName} (${p.emTel})`
+    : "Profil yok";
   show(settingsPanel);
 };
 settingsClose.onclick=()=>hide(settingsPanel);
 editProfile.onclick=()=>show(profilePanel);
 
-/* İZİNLER */
-btnPerms.onclick=()=>show(permPanel);
+/* ==== PERMISSIONS ==== */
+btnPerms.onclick=()=>{
+  loadPermStatus();
+  show(permPanel);
+};
 permClose.onclick=()=>hide(permPanel);
+
 permGPS.onclick=()=>{
   navigator.geolocation.getCurrentPosition(
-    ()=>permResult.innerText="Konum izni alındı",
-    ()=>permResult.innerText="Konum reddedildi"
+    ()=>{ gpsStatus.innerText="Konum izni verildi"; },
+    ()=>{ gpsStatus.innerText="Konum reddedildi"; }
   );
 };
+
 permNotif.onclick=async()=>{
   if(Notification.permission==="denied"){
-    permResult.innerText="Bildirim reddedilmiş (tarayıcı ayarları)";
+    notifStatus.innerText="Bildirim reddedilmiş (tarayıcı ayarı)";
     return;
   }
-  const r=await Notification.requestPermission();
-  permResult.innerText="Bildirim: "+r;
+  const r = await Notification.requestPermission();
+  notifStatus.innerText="Bildirim: "+r;
 };
 
-/* ACİL DAVRANIŞ */
-hold(panicBtn,()=>location.href="tel:112");
+/* ==== ACİL ==== */
+bindHold(panicBtn,()=>{
+  log("112 aranıyor");
+  location.href="tel:112";
+});
 
-hold(acilBtn,()=>{
-  const p=JSON.parse(LS.getItem("profile"));
-  if(!p){alert("Profil yok");return;}
+bindHold(acilBtn,()=>{
+  const p = JSON.parse(LS.getItem("profile"));
+  if(!p){ alert("Profil yok"); return; }
+
   location.href="tel:"+p.emTel;
+
   navigator.geolocation.getCurrentPosition(pos=>{
     const map=`https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`;
     const time=new Date().toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"});
@@ -135,7 +164,9 @@ hold(acilBtn,()=>{
   });
 });
 
+/* INIT */
 loadProfile();
+loadPermStatus();
 </script>
 
 </body>
