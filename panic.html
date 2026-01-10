@@ -3,33 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ACİL</title>
+<title>HG ACİL</title>
 
 <style>
-body{
-  font-family:system-ui, sans-serif;
-  background:#fff;
-  margin:0;
-  padding:24px;
-  text-align:center;
-}
-button{
-  width:100%;
-  padding:26px;
-  font-size:22px;
-  font-weight:700;
-  border:none;
-  border-radius:16px;
-  margin-top:18px;
-  cursor:pointer;
-}
+body{font-family:system-ui,sans-serif;padding:18px;margin:0;background:#fff;color:#111;text-align:center}
+.topbar{display:flex;gap:8px;margin-bottom:12px}
+.topbar button{flex:1;padding:12px;font-size:15px;border-radius:8px;border:none;background:#222;color:#fff}
+button{width:100%;padding:22px;font-size:21px;font-weight:700;border:none;border-radius:14px;margin-top:14px;cursor:pointer}
 #panicBtn{background:#d32f2f;color:#fff}
-#acilKisiBtn{background:#222;color:#fff}
-#info{
-  margin-top:24px;
-  font-size:14px;
-  color:#555;
-}
+#acilBtn{background:#222;color:#fff}
+.panel{display:none;background:#f0f0f0;padding:14px;border-radius:10px;margin-top:14px;text-align:left}
+input{width:100%;padding:10px;font-size:15px;border-radius:6px;border:1px solid #444;margin-top:6px}
+.warn{background:#ffefc2;padding:10px;border-left:4px solid #e6a700;border-radius:6px;margin-top:10px;font-size:13px}
+#logBox{background:#000;color:#fff;font-size:13px;padding:10px;border-radius:8px;margin-top:14px;text-align:left;min-height:40px}
 </style>
 </head>
 
@@ -37,65 +23,119 @@ button{
 
 <h2>Acil Durum</h2>
 
-<button id="panicBtn">🚨 ACİL</button>
-<button id="acilKisiBtn">👤 ACİL KİŞİ</button>
+<div class="topbar">
+  <button id="btnSettings">⚙ Ayarlar</button>
+  <button id="btnPerms">📌 İzinler</button>
+</div>
 
-<div id="info">
-Basılı tut → arama başlar
+<button id="panicBtn">🚨 ACİL</button>
+<button id="acilBtn">👤 ACİL KİŞİ</button>
+
+<div id="logBox">Hazır</div>
+
+<!-- İZİNLER -->
+<div id="permPanel" class="panel">
+  <h3>İzinler</h3>
+  <button id="permGPS">📍 Konum</button>
+  <button id="permNotif">🔔 Bildirim</button>
+  <button id="permClose">Kapat</button>
+  <div id="permResult" class="warn"></div>
+</div>
+
+<!-- AYARLAR -->
+<div id="settingsPanel" class="panel">
+  <h3>Ayarlar</h3>
+  <div id="settingsInfo" class="warn"></div>
+  <button id="editProfile">✏ Profili Düzenle</button>
+  <button id="settingsClose">Kapat</button>
+</div>
+
+<!-- PROFİL -->
+<div id="profilePanel" class="panel">
+  <h3>Profil</h3>
+  <input id="name" placeholder="Ad Soyad">
+  <input id="emName" placeholder="Acil Kişi İsim">
+  <input id="emTel" placeholder="Acil Kişi Telefon">
+  <button id="saveProfile">Kaydet</button>
 </div>
 
 <script>
-/* === AYARLANABİLİR SABİTLER === */
-const USER_NAME = "İSİM SOYİSİM";
-const ACIL_KISI_TEL = "05XXXXXXXXX";
-const HOLD_TIME = 1200; // ms
+const LS = localStorage;
+const HOLD = 1200;
+let timer=null;
 
-let holdTimer = null;
+function log(m){logBox.innerText=m;}
+function show(p){p.style.display="block";}
+function hide(p){p.style.display="none";}
 
-/* === BASILI TUTMA MEKANİĞİ === */
-function bindHold(button, onHold){
-  button.addEventListener("touchstart", start);
-  button.addEventListener("mousedown", start);
-
-  button.addEventListener("touchend", cancel);
-  button.addEventListener("mouseup", cancel);
-  button.addEventListener("mouseleave", cancel);
-
-  function start(){
-    holdTimer = setTimeout(onHold, HOLD_TIME);
-  }
-  function cancel(){
-    clearTimeout(holdTimer);
-  }
+function hold(btn,fn){
+  btn.addEventListener("mousedown",()=>timer=setTimeout(fn,HOLD));
+  btn.addEventListener("touchstart",()=>timer=setTimeout(fn,HOLD));
+  ["mouseup","mouseleave","touchend","touchcancel"].forEach(e=>{
+    btn.addEventListener(e,()=>clearTimeout(timer));
+  });
 }
 
-/* === ACİL 112 === */
-bindHold(document.getElementById("panicBtn"), ()=>{
-  location.href = "tel:112";
-});
+/* PROFİL */
+function loadProfile(){
+  const p=JSON.parse(LS.getItem("profile")||"null");
+  if(p) log("Profil yüklü");
+}
+saveProfile.onclick=()=>{
+  if(!name.value||!emTel.value){alert("Eksik bilgi");return;}
+  LS.setItem("profile",JSON.stringify({
+    name:name.value,
+    emName:emName.value,
+    emTel:emTel.value
+  }));
+  hide(profilePanel);
+  log("Profil kaydedildi");
+};
 
-/* === ACİL KİŞİ === */
-bindHold(document.getElementById("acilKisiBtn"), ()=>{
-  // 1️⃣ Direkt arama
-  location.href = "tel:" + ACIL_KISI_TEL;
+/* AYARLAR */
+btnSettings.onclick=()=>{
+  const p=JSON.parse(LS.getItem("profile")||"{}");
+  settingsInfo.innerText=p.name?`${p.name}\nAcil: ${p.emName} (${p.emTel})`:"Profil yok";
+  show(settingsPanel);
+};
+settingsClose.onclick=()=>hide(settingsPanel);
+editProfile.onclick=()=>show(profilePanel);
 
-  // 2️⃣ Konum + saat al
-  if(navigator.geolocation){
-    navigator.geolocation.getCurrentPosition(pos=>{
-      const lat = pos.coords.latitude;
-      const lon = pos.coords.longitude;
-      const map = `https://maps.google.com/?q=${lat},${lon}`;
-      const time = new Date().toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"});
-      const msg =
-        `${USER_NAME} – ACİL DURUM\n` +
-        `Konum: ${map}\n` +
-        `Saat: ${time}`;
-
-      // 3️⃣ SMS taslağı (web’de mümkün olan en ileri seviye)
-      location.href = "sms:" + ACIL_KISI_TEL + "?body=" + encodeURIComponent(msg);
-    });
+/* İZİNLER */
+btnPerms.onclick=()=>show(permPanel);
+permClose.onclick=()=>hide(permPanel);
+permGPS.onclick=()=>{
+  navigator.geolocation.getCurrentPosition(
+    ()=>permResult.innerText="Konum izni alındı",
+    ()=>permResult.innerText="Konum reddedildi"
+  );
+};
+permNotif.onclick=async()=>{
+  if(Notification.permission==="denied"){
+    permResult.innerText="Bildirim reddedilmiş (tarayıcı ayarları)";
+    return;
   }
+  const r=await Notification.requestPermission();
+  permResult.innerText="Bildirim: "+r;
+};
+
+/* ACİL DAVRANIŞ */
+hold(panicBtn,()=>location.href="tel:112");
+
+hold(acilBtn,()=>{
+  const p=JSON.parse(LS.getItem("profile"));
+  if(!p){alert("Profil yok");return;}
+  location.href="tel:"+p.emTel;
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const map=`https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`;
+    const time=new Date().toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"});
+    const msg=`${p.name} – ACİL DURUM\nKonum: ${map}\nSaat: ${time}`;
+    location.href="sms:"+p.emTel+"?body="+encodeURIComponent(msg);
+    log("Acil kişi bilgilendirildi");
+  });
 });
+
+loadProfile();
 </script>
 
 </body>
