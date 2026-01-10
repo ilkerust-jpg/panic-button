@@ -37,7 +37,6 @@ input{width:100%;padding:10px;font-size:15px;border-radius:6px;border:1px solid 
 <!-- İZİNLER -->
 <div id="permPanel" class="panel">
   <h3>İzinler</h3>
-
   <button id="permGPS">📍 Konum</button>
   <div id="gpsStatus" class="status"></div>
 
@@ -59,7 +58,7 @@ input{width:100%;padding:10px;font-size:15px;border-radius:6px;border:1px solid 
 <div id="profilePanel" class="panel">
   <h3>Profil</h3>
   <input id="name" placeholder="Ad Soyad">
-  <input id="emName" placeholder="Acil Kişi İsim">
+  <input id="emName" placeholder="Acil Kişi İsim (opsiyonel)">
   <input id="emTel" placeholder="Acil Kişi Telefon">
   <button id="saveProfile">Kaydet</button>
 </div>
@@ -80,30 +79,24 @@ function bindHold(btn,fn){
   ["mouseup","mouseleave","touchend","touchcancel"].forEach(e=>btn.addEventListener(e,stop));
 }
 
-/* ==== PERMISSIONS STATE ==== */
-function loadPermStatus(){
-  gpsStatus.innerText = navigator.geolocation ? "Konum API mevcut" : "Konum API yok";
-  notifStatus.innerText = "Bildirim: " + Notification.permission;
-}
-
 /* ==== PROFILE ==== */
 function loadProfile(){
   const p = JSON.parse(LS.getItem("profile")||"null");
   if(!p) return;
-  name.value = p.name;
-  emName.value = p.emName;
-  emTel.value = p.emTel;
+  name.value = p.name || "";
+  emName.value = p.emName || "";
+  emTel.value = p.emTel || "";
 }
 
 saveProfile.onclick=()=>{
-  if(!name.value || !emTel.value){
-    alert("Eksik bilgi");
+  if(!name.value.trim() || !emTel.value.trim()){
+    alert("Ad Soyad ve Acil Kişi Telefon zorunludur");
     return;
   }
   LS.setItem("profile",JSON.stringify({
-    name:name.value,
-    emName:emName.value,
-    emTel:emTel.value
+    name:name.value.trim(),
+    emName:emName.value.trim(),
+    emTel:emTel.value.trim()
   }));
   hide(profilePanel);
   log("Profil kaydedildi");
@@ -113,7 +106,7 @@ saveProfile.onclick=()=>{
 btnSettings.onclick=()=>{
   const p=JSON.parse(LS.getItem("profile")||"{}");
   settingsInfo.innerText = p.name
-    ? `${p.name}\nAcil: ${p.emName} (${p.emTel})`
+    ? `${p.name}\nAcil: ${p.emName || "-"} (${p.emTel})`
     : "Profil yok";
   show(settingsPanel);
 };
@@ -122,7 +115,8 @@ editProfile.onclick=()=>show(profilePanel);
 
 /* ==== PERMISSIONS ==== */
 btnPerms.onclick=()=>{
-  loadPermStatus();
+  gpsStatus.innerText = navigator.geolocation ? "Konum API mevcut" : "Konum API yok";
+  notifStatus.innerText = "Bildirim: " + Notification.permission;
   show(permPanel);
 };
 permClose.onclick=()=>hide(permPanel);
@@ -166,7 +160,6 @@ bindHold(acilBtn,()=>{
 
 /* INIT */
 loadProfile();
-loadPermStatus();
 </script>
 
 </body>
